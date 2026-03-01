@@ -24,6 +24,7 @@ export function applyPlayerPhysics(player: Player, groundY: number, dt: number):
     player.rect.y = groundY - player.rect.h;
     player.vy = 0;
     player.isGrounded = true;
+    player.jumpsUsed = 0;
     if (player.isSliding && player.vx !== 0) {
       player.vx *= GROUND_FRICTION;
       if (Math.abs(player.vx) < 1) player.vx = 0;

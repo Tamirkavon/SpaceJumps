@@ -165,7 +165,8 @@ function drawPlayer(ctx: CanvasRenderingContext2D, player: Player, character: Ch
     ctx.globalAlpha = 0.4;
   }
 
-  drawSprite(ctx, key, x, drawY, w, h);
+  const flip = !player.facingRight;
+  drawSprite(ctx, key, x, drawY, w, h, flip);
   ctx.globalAlpha = 1;
 
   // ── Parry success ring burst (expands outward after success) ─────────
@@ -312,6 +313,7 @@ function drawBossHPBar(ctx: CanvasRenderingContext2D, enemy: Enemy, w: number) {
 function drawPhaseOverlay(
   ctx: CanvasRenderingContext2D, w: number, h: number,
   phase: string, countdownValue: number, world: WorldConfig,
+  liveEnemies: number, currentWave: number,
 ) {
   if (phase === 'countdown') {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -326,13 +328,15 @@ function drawPhaseOverlay(
     ctx.textAlign = 'left';
   }
 
-  if (phase === 'combat') {
-    ctx.fillStyle = '#ef4444';
-    ctx.font = 'bold 20px Orbitron, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 15;
-    ctx.fillText('⚔  COMBAT!', w / 2, 50);
+  if (phase === 'running' && liveEnemies > 0) {
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(w - 108, 8, 100, 26);
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = 'bold 13px Orbitron, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.shadowColor = '#f59e0b';
+    ctx.shadowBlur = 6;
+    ctx.fillText(`👾 ${liveEnemies}`, w - 12, 26);
     ctx.shadowBlur = 0;
     ctx.textAlign = 'left';
   }
@@ -382,6 +386,26 @@ export function GameCanvas({ engine, world, character }: Props) {
     drawBackground(ctx, w, h, world, state.scrollX);
     drawGround(ctx, w, h, world, state.scrollX);
 
+    // Speed lines when charging right
+    if (engine.phase === 'running' && state.scrollSpeed > 105) {
+      const alpha = Math.min(0.35, (state.scrollSpeed - 105) / 60);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      const now = Date.now();
+      for (let i = 0; i < 10; i++) {
+        const yt = (h * 0.1) + (h * 0.75 * i / 10) + ((now * 0.35 + i * 137) % (h * 0.75));
+        const lineLen = 18 + (state.scrollSpeed - 105) * 0.5;
+        const xBase = w * 0.25 + Math.sin(i * 2.1) * w * 0.35;
+        ctx.beginPath();
+        ctx.moveTo(xBase, yt % h);
+        ctx.lineTo(xBase - lineLen, yt % h);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // Obstacles
     for (const obs of engine.obstaclesRef.current) {
       if (obs.rect.x < w + 10 && obs.rect.x + obs.rect.w > -10) {
@@ -419,8 +443,20 @@ export function GameCanvas({ engine, world, character }: Props) {
       drawBossHPBar(ctx, boss, w);
     }
 
+    // Red damage vignette
+    const invMs = player?.invincibleMs ?? 0;
+    if (invMs > 700) {
+      const alpha = Math.min(0.5, (invMs - 700) / 300 * 0.5);
+      const grad = ctx.createRadialGradient(w / 2, h / 2, h * 0.2, w / 2, h / 2, h * 0.85);
+      grad.addColorStop(0, 'rgba(255,0,0,0)');
+      grad.addColorStop(1, `rgba(220,0,0,${alpha})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+    }
+
     // Phase overlays
-    drawPhaseOverlay(ctx, w, h, engine.phase, engine.countdownValue, world);
+    const liveEnemies = engine.enemiesRef.current.filter(e => e.alive).length;
+    drawPhaseOverlay(ctx, w, h, engine.phase, engine.countdownValue, world, liveEnemies, 0);
 
     renderRafRef.current = requestAnimationFrame(renderLoop);
   }, [engine, world, character]);

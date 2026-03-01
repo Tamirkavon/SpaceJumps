@@ -70,6 +70,7 @@ export interface Player extends Entity {
   maxHp: number;
   magicBar: number;
   isGrounded: boolean;
+  jumpsUsed: number;
   isSliding: boolean;
   isAttacking: boolean;
   attackCooldownMs: number;
@@ -79,6 +80,8 @@ export interface Player extends Entity {
   animFrame: number;
   animTimer: number;
   facingRight: boolean;
+  movingLeft: boolean;
+  movingRight: boolean;
   isShielding: boolean;
   parryWindowMs: number;
   parryCooldownMs: number;

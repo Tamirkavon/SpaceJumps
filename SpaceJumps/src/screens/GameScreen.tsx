@@ -64,13 +64,15 @@ export function GameScreen() {
 
   const engine = useGameEngine(character, world, onRunEnd);
 
-  const wrappedJump    = useCallback(() => { engine.jump(); audio.playJump(); }, [engine, audio]);
-  const wrappedAttack  = useCallback(() => { engine.attack(); audio.playAttack(); }, [engine, audio]);
-  const wrappedMagic   = useCallback(() => { engine.castMagic(); audio.playMagic(character.colors.primary); }, [engine, audio, character]);
-  const wrappedSlide   = useCallback(() => { engine.slide(); }, [engine]);
+  const wrappedJump        = useCallback(() => { engine.jump(); audio.playJump(); }, [engine, audio]);
+  const wrappedAttack      = useCallback(() => { engine.attack(); audio.playAttack(); }, [engine, audio]);
+  const wrappedMagic       = useCallback(() => { engine.castMagic(); audio.playMagic(character.colors.primary); }, [engine, audio, character]);
+  const wrappedSlide       = useCallback(() => { engine.slide(); }, [engine]);
   const wrappedShieldStart = useCallback(() => { engine.shield(true); }, [engine]);
   const wrappedShieldEnd   = useCallback(() => { engine.shield(false); }, [engine]);
-  const wrappedParry   = useCallback(() => { engine.parry(); }, [engine]);
+  const wrappedParry       = useCallback(() => { engine.parry(); }, [engine]);
+  const wrappedMoveLeft    = useCallback((active: boolean) => { engine.moveLeft(active); }, [engine]);
+  const wrappedMoveRight   = useCallback((active: boolean) => { engine.moveRight(active); }, [engine]);
 
   useTouchControls({
     onJump: wrappedJump,
@@ -90,16 +92,32 @@ export function GameScreen() {
   const lastParrySuccessMs = player?.lastParrySuccessMs ?? 0;
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-black">
-      <GameCanvas engine={engine} world={world} character={character} />
+    <div className="flex flex-col w-full h-full overflow-hidden bg-black">
+      {/* ── Game area (takes all space above controls) ── */}
+      <div className="relative flex-1 overflow-hidden">
+        <GameCanvas engine={engine} world={world} character={character} />
 
-      {engine.phase !== 'paused' && (
-        <HUD engine={engine} character={character} onPause={handlePause} />
-      )}
+        {engine.phase !== 'paused' && (
+          <HUD engine={engine} character={character} onPause={handlePause} />
+        )}
 
+        {engine.phase === 'paused' && (
+          <PauseMenu
+            character={character}
+            onResume={handleResume}
+            onQuit={handleQuit}
+            score={engine.score}
+          />
+        )}
+      </div>
+
+      {/* ── Always-visible arcade controls at bottom ── */}
       <CombatOverlay
         character={character}
         magicBar={magicBar}
+        onMoveLeft={wrappedMoveLeft}
+        onMoveRight={wrappedMoveRight}
+        onJump={wrappedJump}
         onAttack={wrappedAttack}
         onMagic={wrappedMagic}
         onShieldStart={wrappedShieldStart}
@@ -110,15 +128,6 @@ export function GameScreen() {
         parryCooldownActive={parryCooldownActive}
         lastParrySuccessMs={lastParrySuccessMs}
       />
-
-      {engine.phase === 'paused' && (
-        <PauseMenu
-          character={character}
-          onResume={handleResume}
-          onQuit={handleQuit}
-          score={engine.score}
-        />
-      )}
     </div>
   );
 }

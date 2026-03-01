@@ -14,6 +14,9 @@ export function HUD({ engine, character, onPause }: Props) {
   const magicBar = player?.magicBar ?? 0;
   const hpPct = (hp / maxHp) * 100;
   const hpColor = hpPct > 50 ? '#22c55e' : hpPct > 25 ? '#f59e0b' : '#ef4444';
+  const dist = engine.stateRef.current?.distanceTraveled ?? 0;
+  const bossProgress = Math.min(1, dist / engine.bossDistance);
+  const nearBoss = bossProgress > 0.8;
 
   return (
     <div className="absolute inset-x-0 top-0 z-20 pointer-events-none" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -57,7 +60,7 @@ export function HUD({ engine, character, onPause }: Props) {
           </div>
         </div>
 
-        {/* Center: Score + Distance */}
+        {/* Center: Score + Distance + Boss Bar */}
         <div className="flex flex-col items-center gap-0.5 pointer-events-none">
           <div
             className="font-orbitron font-bold text-lg leading-none"
@@ -66,8 +69,28 @@ export function HUD({ engine, character, onPause }: Props) {
             {engine.score.toLocaleString()}
           </div>
           <div className="text-white/40 text-xs font-mono">
-            {Math.floor((engine.stateRef.current?.distanceTraveled ?? 0) / 10)}m
+            {Math.floor(dist / 10)}m
           </div>
+          {engine.phase === 'running' && (
+            <div className="flex flex-col items-center gap-0.5 mt-0.5">
+              <div
+                className="text-[9px] font-mono uppercase tracking-widest"
+                style={{ color: nearBoss ? '#ef4444' : '#475569', opacity: nearBoss ? 1 : 0.7 }}
+              >
+                {nearBoss ? '⚠ BOSS' : '⚡ BOSS'}
+              </div>
+              <div className="w-16 h-1.5 bg-black/60 rounded-full border border-white/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: `${bossProgress * 100}%`,
+                    background: nearBoss ? '#ef4444' : '#6366f1',
+                    boxShadow: nearBoss ? '0 0 6px #ef4444' : 'none',
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right: Coins + Pause */}

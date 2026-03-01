@@ -170,7 +170,7 @@ export function getBossChunk(worldId: string): LevelChunk {
 
 // How far to travel (in pixels) before boss chunk
 export function getBossDistance(worldId: string): number {
-  const base = worldId === 'nebula' ? 4000 : worldId === 'crimson' ? 6000 : 8000;
+  const base = worldId === 'nebula' ? 2600 : worldId === 'crimson' ? 3900 : 5200;
   return base;
 }
 

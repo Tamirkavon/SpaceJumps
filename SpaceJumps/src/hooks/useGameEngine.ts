@@ -20,6 +20,7 @@ export const PLAYER_W = 36;
 export const PLAYER_H = 56;
 export const BASE_SCROLL_SPEED = 90;   // Beat-em-up walking pace (was 280)
 export const MAX_SCROLL_SPEED = 120;
+export const PLAYER_MOVE_SPEED = 110; // px/s horizontal movement in combat
 
 // Combat constants
 export const SHIELD_DAMAGE_REDUCTION = 0.35; // player takes 35% dmg while shielding
@@ -49,10 +50,11 @@ function makePlayer(char: CharacterConfig, canvasW: number, canvasH: number): Pl
     rect: { x: canvasW * PLAYER_X_FRACTION, y: groundY - PLAYER_H, w: PLAYER_W, h: PLAYER_H },
     vx: 0, vy: 0, alive: true,
     hp: char.stats.health, maxHp: char.stats.health,
-    magicBar: 0, isGrounded: true, isSliding: false,
+    magicBar: 0, isGrounded: true, jumpsUsed: 0, isSliding: false,
     isAttacking: false, attackCooldownMs: 0, invincibleMs: 0,
     combo: 0, coins: 0, animFrame: 0, animTimer: 0,
     facingRight: true,
+    movingLeft: false, movingRight: false,
     isShielding: false,
     parryWindowMs: 0, parryCooldownMs: 0, isParrying: false,
     lastParrySuccessMs: 0, comboHits: 0, comboWindowMs: 0,
@@ -172,8 +174,13 @@ export interface GameEngineReturn {
   castMagic: () => void;
   shield: (active: boolean) => void;
   parry: () => void;
+  moveLeft: (active: boolean) => void;
+  moveRight: (active: boolean) => void;
   pauseGame: () => void;
   resumeGame: () => void;
+  waveRef: React.MutableRefObject<number>;
+  bossDistance: number;
+  scrollSpeed: number;
   onCanvasReady: (w: number, h: number) => void;
 }
 
@@ -252,6 +259,16 @@ export function useGameEngine(
     // ── Physics ──────────────────────────────────────────────────────────
     applyPlayerPhysics(player, groundY, dt);
 
+    // ── Player horizontal movement (running/boss) ─────────────────────────
+    if (ph === 'running' || ph === 'boss') {
+      const moveSpeed = player.movingLeft ? -PLAYER_MOVE_SPEED
+        : player.movingRight ? PLAYER_MOVE_SPEED : 0;
+      if (moveSpeed !== 0) {
+        player.rect.x = Math.max(10, Math.min(CW - PLAYER_W - 10, player.rect.x + moveSpeed * dt));
+        player.facingRight = moveSpeed > 0;
+      }
+    }
+
     // Cooldown timers
     if (player.attackCooldownMs > 0) player.attackCooldownMs -= dt * 1000;
     if (player.invincibleMs > 0) player.invincibleMs -= dt * 1000;
@@ -273,10 +290,15 @@ export function useGameEngine(
 
     // ── World Scroll (running phase only — stops in combat/boss) ─────────
     if (ph === 'running') {
-      const speed = BASE_SCROLL_SPEED; // constant walking pace, no acceleration
+      const targetSpeed = player.movingRight
+        ? MAX_SCROLL_SPEED
+        : player.movingLeft
+        ? 30
+        : BASE_SCROLL_SPEED;
+      state.scrollSpeed += (targetSpeed - state.scrollSpeed) * Math.min(1, dt * 3);
+      const speed = state.scrollSpeed;
       state.scrollX += speed * dt;
       state.distanceTraveled += speed * dt;
-      state.scrollSpeed = speed;
 
       // Scroll obstacles and collectibles leftward
       for (const obs of obstaclesRef.current) { obs.rect.x -= speed * dt; }
@@ -299,6 +321,8 @@ export function useGameEngine(
           enemiesRef.current, obstaclesRef.current, collectiblesRef.current, wrld);
         // Spawn boss enemy directly on screen
         spawnCombatWave([wrld.bossType], CW, CH, enemiesRef.current);
+        // Clear wave enemies — boss fight starts clean
+        enemiesRef.current = enemiesRef.current.filter(e => e.type.startsWith('boss'));
         setPhaseSync('boss');
       } else if (nextChunkXRef.current - state.scrollX < CW * 2) {
         const difficulty = worldDifficultyAt(state.distanceTraveled, wrld.difficultyMultiplier);
@@ -308,17 +332,16 @@ export function useGameEngine(
         nextChunkXRef.current += chunk.width;
       }
 
-      // Wave-based enemy spawning
+      // Wave-based enemy spawning — world keeps scrolling, no phase change
       const waveIdx = nextWaveIdxRef.current;
       if (waveIdx < COMBAT_WAVES.length && state.distanceTraveled >= COMBAT_WAVES[waveIdx].distanceMin) {
         spawnCombatWave(COMBAT_WAVES[waveIdx].enemies, CW, CH, enemiesRef.current);
         nextWaveIdxRef.current = waveIdx + 1;
-        setPhaseSync('combat');
       }
     }
 
-    // Animate collectibles in non-running phases too
-    if (ph === 'combat' || ph === 'boss') {
+    // Animate collectibles during boss phase (running phase animates them above)
+    if (ph === 'boss') {
       for (const col of collectiblesRef.current) {
         col.animPhase += dt * 3;
       }
@@ -344,26 +367,23 @@ export function useGameEngine(
         const ex = enemy.rect.x + enemy.rect.w / 2;
         const dist = Math.abs(px - ex);
 
-        // Enemy movement — only in combat/boss phase (world is stopped)
-        if (ph === 'combat' || ph === 'boss') {
-          if (enemy.movePattern === 'patrol') {
-            const dir = px < ex ? -1 : 1;
-            enemy.rect.x += dir * 75 * dt;
-          } else if (enemy.movePattern === 'charge') {
-            const dir = px < ex ? -1 : 1;
-            enemy.rect.x += dir * 120 * dt;
-          } else if (enemy.movePattern === 'boss') {
-            if (!enemy.vx) enemy.vx = -60;
-            enemy.rect.x += enemy.vx * dt;
-            if (enemy.rect.x < CW * 0.4 || enemy.rect.x > CW * 0.7) enemy.vx *= -1;
-          }
-          // Keep enemies from walking off left edge
-          if (enemy.rect.x < 10) enemy.rect.x = 10;
-        } else if (ph === 'running') {
-          // During running, enemy walks toward player at slow pace
+        // Enemy movement — always active at full speed
+        if (enemy.movePattern === 'patrol') {
           const dir = px < ex ? -1 : 1;
-          enemy.rect.x += dir * 60 * dt;
+          enemy.rect.x += dir * 75 * dt;
+        } else if (enemy.movePattern === 'charge') {
+          const dir = px < ex ? -1 : 1;
+          enemy.rect.x += dir * 120 * dt;
+        } else if (enemy.movePattern === 'shooter') {
+          const dir = px < ex ? -1 : 1;
+          if (dist > 150) enemy.rect.x += dir * 50 * dt;
+        } else if (enemy.movePattern === 'boss') {
+          if (!enemy.vx) enemy.vx = -60;
+          enemy.rect.x += enemy.vx * dt;
+          if (enemy.rect.x < CW * 0.4 || enemy.rect.x > CW * 0.7) enemy.vx *= -1;
         }
+        // Keep enemies from walking off left edge
+        if (enemy.rect.x < 10) enemy.rect.x = 10;
 
         // Melee attack player if in range
         if (dist < 65 && enemy.attackCooldownMs <= 0) {
@@ -432,12 +452,10 @@ export function useGameEngine(
       enemiesRef.current = enemiesRef.current.filter(e => e.alive);
       state.enemiesKilled += beforeCount - enemiesRef.current.length;
 
-      // Check if combat/boss is over
+      // Check if boss is defeated
       const aliveOnScreen = enemiesRef.current.filter(e => e.rect.x < CW + 150).length;
       if (aliveOnScreen === 0) {
-        if (ph === 'combat') {
-          setPhaseSync('running');
-        } else if (ph === 'boss') {
+        if (ph === 'boss') {
           state.levelCleared = true;
           setPhaseSync('level-clear');
           onRunEndRef.current({
@@ -534,13 +552,17 @@ export function useGameEngine(
   // ── Player Actions ─────────────────────────────────────────────────────
   const jump = useCallback(() => {
     const ph = phaseRef.current;
-    if (ph !== 'running' && ph !== 'combat') return;
+    if (ph !== 'running' && ph !== 'combat' && ph !== 'boss') return;
     const player = playerRef.current;
     if (!player) return;
     if (player.isGrounded) {
       player.vy = character.stats.jumpForce;
       player.isGrounded = false;
       player.isSliding = false;
+      player.jumpsUsed = 1;
+    } else if (player.jumpsUsed < 2) {
+      player.vy = character.stats.jumpForce * 0.85;
+      player.jumpsUsed = 2;
     }
   }, [character.stats.jumpForce]);
 
@@ -555,7 +577,7 @@ export function useGameEngine(
 
   const attack = useCallback(() => {
     const ph = phaseRef.current;
-    if (ph !== 'combat' && ph !== 'boss') return;
+    if (ph !== 'running' && ph !== 'boss') return;
     const player = playerRef.current;
     if (!player || player.attackCooldownMs > 0) return;
 
@@ -572,11 +594,9 @@ export function useGameEngine(
     player.attackCooldownMs = isFinisher ? 600 : 300;
     setTimeout(() => { if (playerRef.current) playerRef.current.isAttacking = false; }, 220);
 
-    const atkRect = {
-      x: player.rect.x + player.rect.w,
-      y: player.rect.y + player.rect.h * 0.2,
-      w: hitboxW, h: player.rect.h * 0.6,
-    };
+    const atkRect = player.facingRight
+      ? { x: player.rect.x + player.rect.w, y: player.rect.y + player.rect.h * 0.2, w: hitboxW, h: player.rect.h * 0.6 }
+      : { x: player.rect.x - hitboxW, y: player.rect.y + player.rect.h * 0.2, w: hitboxW, h: player.rect.h * 0.6 };
 
     let hitAny = false;
     for (const enemy of enemiesRef.current) {
@@ -618,7 +638,7 @@ export function useGameEngine(
 
   const castMagic = useCallback(() => {
     const ph = phaseRef.current;
-    if (ph !== 'combat' && ph !== 'boss') return;
+    if (ph !== 'running' && ph !== 'boss') return;
     const player = playerRef.current;
     if (!player || player.magicBar < character.stats.magicCost) return;
     player.magicBar -= character.stats.magicCost;
@@ -660,7 +680,7 @@ export function useGameEngine(
 
   const parry = useCallback(() => {
     const ph = phaseRef.current;
-    if (ph !== 'combat' && ph !== 'boss') return;
+    if (ph !== 'running' && ph !== 'boss') return;
     const player = playerRef.current;
     if (!player) return;
     if (player.parryCooldownMs > 0) return; // on cooldown
@@ -668,6 +688,20 @@ export function useGameEngine(
     player.isParrying = true;
     player.parryWindowMs = PARRY_WINDOW_MS;
     player.parryCooldownMs = PARRY_COOLDOWN_MS;
+  }, []);
+
+  const moveLeft = useCallback((active: boolean) => {
+    const player = playerRef.current;
+    if (!player) return;
+    player.movingLeft = active;
+    if (active) player.movingRight = false;
+  }, []);
+
+  const moveRight = useCallback((active: boolean) => {
+    const player = playerRef.current;
+    if (!player) return;
+    player.movingRight = active;
+    if (active) player.movingLeft = false;
   }, []);
 
   const pauseGame = useCallback(() => {
@@ -698,6 +732,11 @@ export function useGameEngine(
     stateRef, playerRef, enemiesRef, obstaclesRef, collectiblesRef,
     projectilesRef, particlesRef,
     phase, score, lives, countdownValue,
-    jump, slide, attack, castMagic, shield, parry, pauseGame, resumeGame, onCanvasReady,
+    jump, slide, attack, castMagic, shield, parry,
+    moveLeft, moveRight,
+    pauseGame, resumeGame, onCanvasReady,
+    waveRef: nextWaveIdxRef,
+    bossDistance: getBossDistance(world.id),
+    scrollSpeed: stateRef.current?.scrollSpeed ?? BASE_SCROLL_SPEED,
   };
 }
