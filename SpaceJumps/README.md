@@ -4,13 +4,16 @@ A space-themed runner-brawler adventure game for mobile and web. Select your her
 
 ## Play Now
 
-> Deployment in progress — link will be added here once live.
+**https://spacejumpsapp.netlify.app**
 
 ## Gameplay
 
-- **Run & Jump** — tap to jump, swipe down to slide past obstacles
-- **Combat Mode** — when enemies appear, scroll pauses and attack/magic buttons appear
-- **Boss Fights** — 3-phase boss at the end of each world
+Golden Axe + Tekken style beat-em-up. Walk through space worlds, fight waves of enemies with a full combat system, and defeat bosses.
+
+- **Run & Jump** — tap to jump over obstacles, slide under lasers
+- **Wave Combat** — enemy waves spawn and walk toward you; the screen stops while you fight
+- **4 Combat Buttons** — Attack (3-hit combo with FINISH!), Magic (area blast), Shield (hold to block 65% damage), Parry (tap for perfect block + counter)
+- **Boss Fights** — powerful boss at the end of each world
 - **4 Characters** — Zara, Krix, Lyra, Vorn (each with unique stats and magic)
 - **3 Worlds** — Nebula Fields, Crimson Void, The Void Rift
 - **Shop & Missions** — earn coins, unlock characters and worlds, complete objectives
@@ -43,3 +46,7 @@ Build for production:
 ```bash
 npm run build
 ```
+
+## Deploy
+
+Uses Netlify. Run `/netlify-deploy` in Claude Code to build and push to production automatically.
