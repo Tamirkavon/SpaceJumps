@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__ebec5190-5442-4da7-9646-d7ef3c7136bd__get_apps",
+      "mcp__ebec5190-5442-4da7-9646-d7ef3c7136bd__get_deploy_instructions",
+      "mcp__ebec5190-5442-4da7-9646-d7ef3c7136bd__deploy_app",
+      "mcp__ebec5190-5442-4da7-9646-d7ef3c7136bd__get_app_status",
+      "mcp__ebec5190-5442-4da7-9646-d7ef3c7136bd__src_glob",
+      "mcp__ebec5190-5442-4da7-9646-d7ef3c7136bd__src_read",
+      "mcp__claude_ai_AppDeploy__get_apps",
+      "mcp__claude_ai_AppDeploy__get_deploy_instructions",
+      "mcp__claude_ai_AppDeploy__deploy_app",
+      "mcp__claude_ai_AppDeploy__get_app_status",
+      "mcp__claude_ai_AppDeploy__src_glob",
+      "mcp__claude_ai_AppDeploy__src_read",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where npm)",
+      "Bash(command -v npm)",
+      "Bash(echo $PATH)",
+      "Bash(cmd.exe /c \"node --version\")",
+      "Bash(ls node_modules/.bin/vite*)",
+      "Bash(npx vite --version)",
+      "mcp__ebec5190-5442-4da7-9646-d7ef3c7136bd__get_app_template",
+      "Bash(powershell -Command \"Get-ChildItem -Path ''C:\\\\Users\\\\USER\\\\Desktop\\\\Claude Code\\\\SpaceJumps'' -Recurse -Depth 3 | Select-Object FullName\")",
+      "Bash(powershell -Command \"Get-ChildItem -Path ''C:\\\\Users\\\\USER\\\\Desktop\\\\Claude Code\\\\SpaceJumps'' | Format-List\")",
+      "Bash(powershell -Command \"Test-Path ''C:\\\\Users\\\\USER\\\\Desktop\\\\Claude Code\\\\SpaceJumps''\")",
+      "Bash(cmd /c \"dir /a /b \"\"C:\\\\Users\\\\USER\\\\Desktop\\\\Claude Code\\\\SpaceJumps\"\"\")"
+    ]
+  }
+}
